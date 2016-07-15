@@ -10,6 +10,7 @@ public class PluginConfig {
     private static Logger LOGGER = Logger.getLoggerFor(GoNotificationPlugin.class);
     private static final String PLUGIN_CONF = "gocd-websocket-notifier.conf";
     private int port = 8887;
+    private String pingUrl = "http://localhost/ci-receiver";
 
     public PluginConfig() {
         String userHome = System.getProperty("user.home");
@@ -22,9 +23,15 @@ public class PluginConfig {
             if (config.hasPath("port")) {
                 setPort(config.getInt("port"));
             }
+            if (config.hasPath("url")) {
+                setPingUrl(config.getString("url"));
+            }
         }
     }
 
     public int getPort() { return port; }
     public void setPort(int port) { this.port = port; }
+
+    public String getPingUrl() { return pingUrl; }
+    public void setPingUrl(String pingUrl) { this.pingUrl = pingUrl; }
 }
