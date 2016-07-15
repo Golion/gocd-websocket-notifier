@@ -9,6 +9,10 @@ import com.thoughtworks.go.plugin.api.logging.Logger;
 import com.thoughtworks.go.plugin.api.request.GoPluginApiRequest;
 import com.thoughtworks.go.plugin.api.response.GoPluginApiResponse;
 
+import java.io.OutputStreamWriter;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.net.UnknownHostException;
 import java.util.*;
 
@@ -23,9 +27,14 @@ public class GoNotificationPlugin
     public static final int SUCCESS_RESPONSE_CODE = 200;
     public static final int INTERNAL_ERROR_RESPONSE_CODE = 500;
     private static WebSocketPipelineListener pipelineListener;
+    private static String pingUrl;
 
     @Override
     public void initializeGoApplicationAccessor(GoApplicationAccessor goApplicationAccessor) {
+        if(pingUrl == null){
+            PluginConfig pluginConfig = new PluginConfig();
+            pingUrl = pluginConfig.getPingUrl();
+        }
         if (pipelineListener == null) {
             PluginConfig pluginConfig = new PluginConfig();
             int port = pluginConfig.getPort();
@@ -78,6 +87,7 @@ public class GoNotificationPlugin
         try {
             response.put("status", "success");
             pipelineListener.notify(goPluginApiRequest);
+            notifyRemoteService(goPluginApiRequest);
         } catch (Exception e) {
             LOGGER.error("failed to notify pipeline listener", e);
             responseCode = INTERNAL_ERROR_RESPONSE_CODE;
@@ -87,6 +97,24 @@ public class GoNotificationPlugin
 
         response.put("messages", messages);
         return renderJSON(responseCode, response);
+    }
+
+    private void notifyRemoteService( GoPluginApiRequest goPluginApiRequest ) {
+        try {
+            HttpURLConnection connection = (HttpURLConnection) new URL( pingUrl ).openConnection();
+            connection.setRequestMethod( "PUT" );
+            connection.setDoOutput( true );
+            OutputStreamWriter out = new OutputStreamWriter( connection.getOutputStream() );
+            out.write( goPluginApiRequest.requestBody() );
+            out.close();
+            
+            int responseCode = connection.getResponseCode();
+            if( ( responseCode > 299 ) || ( responseCode < 200 ) ){
+                throw new Exception("Response code from remote notification server: "+responseCode);
+            }
+        } catch( Exception e ) {
+            throw new RuntimeException( e );
+        }
     }
 
     private GoPluginApiResponse renderJSON(final int responseCode, Object response) {
